@@ -1,42 +1,55 @@
-const { Command } = require('commander');
+const express = require('express');
 const contacts = require('./contacts');
 
-const program = new Command();
-program
-  .option('-a, --action <type>', 'choose action')
-  .option('-i, --id <type>', 'user id')
-  .option('-n, --name <type>', 'user name')
-  .option('-e, --email <type>', 'user email')
-  .option('-p, --phone <type>', 'user phone');
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-program.parse(process.argv);
-const argv = program.opts();
+// Middleware
+app.use(express.json());
 
-async function invokeAction({ action, id, name, email, phone }) {
-  switch (action) {
-    case 'list':
-      const allContacts = await contacts.listContacts();
-      console.table(allContacts);
-      break;
+// Endpointy API
+app.get('/contacts', async (req, res) => {
+  try {
+    const allContacts = await contacts.listContacts();
+    res.json(allContacts);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
-    case 'get':
-      const contact = await contacts.getContactById(id);
-      console.log(contact || 'Contact not found');
-      break;
+app.get('/contacts/:id', async (req, res) => {
+  try {
+    const contact = await contacts.getContactById(req.params.id);
+    if (!contact) return res.status(404).json({ error: 'Contact not found' });
+    res.json(contact);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
-    case 'add':
-      const newContact = await contacts.addContact(name, email, phone);
-      console.log('Added contact:', newContact);
-      break;
+// Dodaj pozostałe endpointy (POST, DELETE) według potrzeb
 
-    case 'remove':
-      const removedContact = await contacts.removeContact(id);
-      console.log(removedContact ? 'Removed contact:' : 'Contact not found', removedContact);
-      break;
+// Uruchom serwer
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 
-    default:
-      console.warn('\x1B[31m Unknown action type!');
+// Zachowaj funkcjonalność CLI dla lokalnego rozwoju
+if (process.env.NODE_ENV === 'development') {
+  const { Command } = require('commander');
+  const program = new Command();
+  
+  program
+    .option('-a, --action <type>', 'choose action')
+    .option('-i, --id <type>', 'user id')
+    .option('-n, --name <type>', 'user name')
+    .option('-e, --email <type>', 'user email')
+    .option('-p, --phone <type>', 'user phone');
+
+  program.parse(process.argv);
+  const argv = program.opts();
+
+  if (argv.action) {
+    require('./cli')(argv); // Przenieś logikę CLI do osobnego pliku
   }
 }
-
-invokeAction(argv);
